@@ -61,49 +61,50 @@ output
 
 > {"id":1,"firstName":"FirstName","name":"LastName"}
 
+    package main
 
 import (
-	"fmt"
-
-	"github.com/zxfonline/json"
+     	"fmt"
+	
+     	"github.com/zxfonline/json"
 )
-
-func main() {
-	m := make(map[*EE]bool)
-	point := new(EE)
-	//or
-	//	point := &EE{}
-	point.name = "aaa"
-	m[point] = true
-	b, err := json.Marshal(m)
-	if err != nil {
-		panic(err)
+	
+     	func main() {
+     	     	m := make(map[*EE]bool)
+     	     	point := new(EE)
+		//or
+		//	point := &EE{}
+		point.name = "aaa"
+		m[point] = true
+		b, err := json.Marshal(m)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(b))
+		a1 := make(map[*EE]bool)
+		err = json.Unmarshal(b, &a1)
+		if err != nil {
+			panic(err)
+		}
+		b, err = json.Marshal(&a1)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(b))
 	}
-	fmt.Println(string(b))
-	a1 := make(map[*EE]bool)
-	err = json.Unmarshal(b, &a1)
-	if err != nil {
-		panic(err)
+	
+	type EE struct {
+		name string
 	}
-	b, err = json.Marshal(&a1)
-	if err != nil {
-		panic(err)
+	
+	func (n *EE) MarshalText() ([]byte, error) {
+		return []byte(n.name), nil
 	}
-	fmt.Println(string(b))
-}
-
-type EE struct {
-	name string
-}
-
-func (n *EE) MarshalText() ([]byte, error) {
-	return []byte(n.name), nil
-}
-
-func (n *EE) UnmarshalText(text []byte) error {
-	n.name = string(text)
-	return nil
-}
+	
+	func (n *EE) UnmarshalText(text []byte) error {
+		n.name = string(text)
+		return nil
+	}
 	
 output
 
