@@ -580,30 +580,25 @@ func (d *decodeState) object(v reflect.Value) {
 	// Check type of target: struct or map[string]T
 	switch v.Kind() {
 	case reflect.Map:
-		// map must have string kind
-		t := v.Type()
-		//		if t.Key().Kind() != reflect.String {
-		//			d.saveError(&UnmarshalTypeError{"object", v.Type(), int64(d.off)})
-		//			d.off--
-		//			d.next() // skip over { } in input
-		//			return
-		//		}
-		//MODIFY
-		switch t.Key().Kind() {
-		case reflect.Bool:
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		case reflect.Float32:
-		case reflect.Float64:
-		case reflect.String:
-		default:
-			d.saveError(&UnmarshalTypeError{"object", v.Type(), int64(d.off)})
-			d.off--
-			d.next() // skip over { } in input
-			return
+		kt := v.Type().Key()
+		if kt.Implements(textUnmarshalerType) {
+		} else {
+			switch kt.Kind() {
+			case reflect.Bool:
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+			case reflect.Float32:
+			case reflect.Float64:
+			case reflect.String:
+			default:
+				d.saveError(&UnmarshalTypeError{"object", v.Type(), int64(d.off)})
+				d.off--
+				d.next() // skip over { } in input
+				return
+			}
 		}
 		if v.IsNil() {
-			v.Set(reflect.MakeMap(t))
+			v.Set(reflect.MakeMap(v.Type()))
 		}
 	case reflect.Struct:
 
@@ -701,112 +696,56 @@ func (d *decodeState) object(v reflect.Value) {
 		// Write value back to map;
 		// if using struct, subv points into struct already.
 		if v.Kind() == reflect.Map {
-			//			kv := reflect.ValueOf(key).Convert(v.Type().Key())
-			//			v.SetMapIndex(kv, subv)
-			//MODIFY
-			s := string(key)
-			key_type := v.Type().Key()
-			switch key_type.Kind() {
-			case reflect.Bool:
-				n, err := strconv.ParseBool(s)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"bool " + s, key_type, int64(d.off)})
-					break
+			vkt := v.Type().Key()
+			if vkt.Implements(textUnmarshalerType) {
+				kv := reflect.New(vkt).Elem()
+				decAlloc(kv)
+				method := kv.MethodByName("UnmarshalText")
+				method.Call([]reflect.Value{reflect.ValueOf(key)})
+				v.SetMapIndex(kv, subv)
+			} else {
+				s := string(key)
+				switch vkt.Kind() {
+				case reflect.Bool:
+					n, err := strconv.ParseBool(s)
+					if err != nil {
+						d.saveError(&UnmarshalTypeError{"bool " + s, v.Type(), int64(d.off)})
+						break
+					}
+					kv := reflect.New(vkt).Elem()
+					kv.SetBool(n)
+					v.SetMapIndex(kv, subv)
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					n, err := strconv.ParseInt(s, 10, 64)
+					if err != nil {
+						d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
+						break
+					}
+					kv := reflect.New(vkt).Elem()
+					kv.SetInt(n)
+					v.SetMapIndex(kv, subv)
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+					n, err := strconv.ParseUint(s, 10, 64)
+					if err != nil {
+						d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
+						break
+					}
+					kv := reflect.New(vkt).Elem()
+					kv.SetUint(n)
+					v.SetMapIndex(kv, subv)
+				case reflect.Float32, reflect.Float64:
+					n, err := strconv.ParseFloat(s, vkt.Bits())
+					if err != nil {
+						d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
+						break
+					}
+					kv := reflect.New(vkt).Elem()
+					kv.SetFloat(n)
+					v.SetMapIndex(kv, subv)
+				case reflect.String:
+					kv := reflect.ValueOf(key).Convert(v.Type().Key())
+					v.SetMapIndex(kv, subv)
 				}
-				v.SetMapIndex(reflect.ValueOf(n), subv)
-			case reflect.Int:
-				n, err := strconv.ParseInt(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"int " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(int(n)), subv)
-			case reflect.Int8:
-				n, err := strconv.ParseInt(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"int8 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(int8(n)), subv)
-			case reflect.Int16:
-				n, err := strconv.ParseInt(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"int16 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(int16(n)), subv)
-			case reflect.Int32:
-				n, err := strconv.ParseInt(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"int32 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(int32(n)), subv)
-			case reflect.Int64:
-				n, err := strconv.ParseInt(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"int64 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(int64(n)), subv)
-			case reflect.Uint:
-				n, err := strconv.ParseUint(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"uint " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(uint(n)), subv)
-			case reflect.Uint8:
-				n, err := strconv.ParseUint(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"uint8 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(uint8(n)), subv)
-			case reflect.Uint16:
-				n, err := strconv.ParseUint(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"uint16 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(uint16(n)), subv)
-			case reflect.Uint32:
-				n, err := strconv.ParseUint(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"uint32 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(uint32(n)), subv)
-			case reflect.Uint64:
-				n, err := strconv.ParseUint(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"uint64 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(n), subv)
-			case reflect.Uintptr:
-				n, err := strconv.ParseUint(s, 10, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"uintptr " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(uintptr(n)), subv)
-			case reflect.Float32:
-				n, err := strconv.ParseFloat(s, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"float32 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(float32(n)), subv)
-			case reflect.Float64:
-				n, err := strconv.ParseFloat(s, 64)
-				if err != nil {
-					d.saveError(&UnmarshalTypeError{"float64 " + s, key_type, int64(d.off)})
-					break
-				}
-				v.SetMapIndex(reflect.ValueOf(n), subv)
-			case reflect.String:
-				v.SetMapIndex(reflect.ValueOf(s), subv)
 			}
 		}
 
@@ -819,6 +758,15 @@ func (d *decodeState) object(v reflect.Value) {
 			d.error(errPhase)
 		}
 	}
+}
+func decAlloc(v reflect.Value) reflect.Value {
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		v = v.Elem()
+	}
+	return v
 }
 
 // literal consumes a literal from d.data[d.off-1:], decoding into the value v.

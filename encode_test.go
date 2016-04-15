@@ -6,8 +6,11 @@ package json
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 	"unicode"
 )
@@ -535,4 +538,166 @@ func TestEncodeString(t *testing.T) {
 			t.Errorf("Marshal(%q) = %#q, want %#q", tt.in, out, tt.out)
 		}
 	}
+}
+
+type MapPos int64
+
+func (n *MapPos) X() int16 {
+	return int16(int32(*n) >> 16)
+}
+
+func (n *MapPos) Y() int16 {
+	return int16((*n << 48) >> 48)
+}
+func (n *MapPos) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("%d,%d", n.X(), n.Y())), nil
+}
+
+func (n *MapPos) UnmarshalText(text []byte) error {
+	ps := strings.Split(string(text), ",")
+	x, _ := strconv.ParseInt(ps[0], 10, 16)
+	y, _ := strconv.ParseInt(ps[1], 10, 16)
+	*n = MapPos(int64(int64(x)<<16 + int64(uint16(y))))
+	return nil
+}
+
+func CreateMapPos(x, y int16) MapPos {
+	return MapPos(int64(int64(x)<<16 + int64(uint16(y))))
+}
+
+func mapPointEncode() {
+	//	var x int16 = -32768
+	//	var y int16 = -32768
+	//	var n int64 = int64(int64(x)<<16 + int64(uint16(y)))
+	//	var nx int16 = int16(int32(n) >> 16)
+	//	var ny int16 = int16((n << 48) >> 48)
+	//	fmt.Println(x, y, n, nx, ny)
+
+	var x int32 = -32768
+	var y int32 = -32768
+	var n int64 = int64(int64(x)<<32 + int64(uint32(y)))
+	var nx int32 = int32(int64(n) >> 32)
+	var ny int32 = int32((n << 32) >> 32)
+	fmt.Println(x, y, n, nx, ny)
+}
+
+func TestBastTypeMarshalerPointKeyMap(t *testing.T) {
+	m := make(map[*MapPos]bool)
+	point := CreateMapPos(-32768, 32767)
+	m[&point] = true
+
+	b, err := Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//	fmt.Println(string(b))
+	want := string(b)
+	a1 := make(map[*MapPos]bool)
+	err = Unmarshal(b, &a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = Marshal(&a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	//	fmt.Println(string(b))
+	if got != want {
+		t.Fatalf("Marshal: got %s want %s", got, want)
+	}
+}
+
+func TestBastTypeMarshalerNoPointKeyMap(t *testing.T) {
+	m := make(map[MapPos]bool)
+	point := CreateMapPos(-32768, 32767)
+	m[point] = true
+	b, err := Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := string(b)
+	//	fmt.Println(string(b))
+	a1 := make(map[MapPos]bool)
+	err = Unmarshal(b, &a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = Marshal(&a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	if got != want {
+		t.Fatalf("Marshal: got %s want %s", got, want)
+	}
+	//	fmt.Println(string(b))
+}
+
+func TestBastTypeMapKey(t *testing.T) {
+	m := make(map[float32]bool)
+	m[3.14] = true
+
+	b, err := Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := string(b)
+	//	fmt.Println(string(b))
+	a1 := make(map[float32]bool)
+	err = Unmarshal(b, &a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = Marshal(&a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	if got != want {
+		t.Fatalf("Marshal: got %s want %s", got, want)
+	}
+	//	fmt.Println(string(b))
+}
+
+func TestTypePointMapkey(t *testing.T) {
+	m := make(map[*EE]bool)
+	point := new(EE)
+	//or
+	//	point := &EE{}
+	point.name = "aaa"
+	m[point] = true
+	b, err := Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := string(b)
+	//	fmt.Println(string(b))
+	a1 := make(map[*EE]bool)
+	err = Unmarshal(b, &a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = Marshal(&a1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	//	fmt.Println(string(b))
+	if got != want {
+		t.Fatalf("Marshal: got %s want %s", got, want)
+	}
+}
+
+type EE struct {
+	name string
+}
+
+func (n *EE) MarshalText() ([]byte, error) {
+	return []byte(n.name), nil
+}
+
+func (n *EE) UnmarshalText(text []byte) error {
+	n.name = string(text)
+	return nil
 }

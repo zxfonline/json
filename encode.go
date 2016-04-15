@@ -371,8 +371,9 @@ func typeEncoder(t reflect.Type) encoderFunc {
 }
 
 var (
-	marshalerType     = reflect.TypeOf(new(Marshaler)).Elem()
-	textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+	marshalerType       = reflect.TypeOf(new(Marshaler)).Elem()
+	textMarshalerType   = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+	textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 )
 
 // newTypeEncoder constructs an encoderFunc for a type.
@@ -483,6 +484,19 @@ func addrTextMarshalerEncoder(e *encodeState, v reflect.Value, quoted bool) {
 		return
 	}
 	m := va.Interface().(encoding.TextMarshaler)
+	b, err := m.MarshalText()
+	if err != nil {
+		e.error(&MarshalerError{v.Type(), err})
+	}
+	e.stringBytes(b)
+}
+
+func textMapKeyMarshalerEncoder(e *encodeState, v reflect.Value, quoted bool) {
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		e.string("null")
+		return
+	}
+	m := v.Interface().(encoding.TextMarshaler)
 	b, err := m.MarshalText()
 	if err != nil {
 		e.error(&MarshalerError{v.Type(), err})
@@ -623,7 +637,8 @@ func newStructEncoder(t reflect.Type) encoderFunc {
 }
 
 type mapEncoder struct {
-	elemEnc encoderFunc
+	elemEnc    encoderFunc
+	keytextEnc encoderFunc
 }
 
 func (me *mapEncoder) encode(e *encodeState, v reflect.Value, _ bool) {
@@ -638,23 +653,23 @@ func (me *mapEncoder) encode(e *encodeState, v reflect.Value, _ bool) {
 		if i > 0 {
 			e.WriteByte(',')
 		}
-		//		e.string(k.String())
-		//MODIFY
-		switch k.Kind() {
-		case reflect.Bool:
-			boolEncoder(e, k, true)
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			intEncoder(e, k, true)
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			uintEncoder(e, k, true)
-		case reflect.Float32:
-			float32Encoder(e, k, true)
-		case reflect.Float64:
-			float64Encoder(e, k, true)
-		case reflect.String:
-			stringEncoder(e, k, false)
-		default:
-			e.string(k.String())
+		if me.keytextEnc != nil {
+			me.keytextEnc(e, k, true)
+		} else {
+			switch k.Kind() {
+			case reflect.Bool:
+				boolEncoder(e, k, true)
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				intEncoder(e, k, true)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+				uintEncoder(e, k, true)
+			case reflect.Float32:
+				float32Encoder(e, k, true)
+			case reflect.Float64:
+				float64Encoder(e, k, true)
+			default:
+				e.string(k.String())
+			}
 		}
 		e.WriteByte(':')
 		me.elemEnc(e, v.MapIndex(k), false)
@@ -663,21 +678,26 @@ func (me *mapEncoder) encode(e *encodeState, v reflect.Value, _ bool) {
 }
 
 func newMapEncoder(t reflect.Type) encoderFunc {
-	//	if t.Key().Kind() != reflect.String {
-	//		return unsupportedTypeEncoder
-	//	}
-	//MODIFY
-	switch t.Key().Kind() {
-	case reflect.Bool:
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-	case reflect.Float32:
-	case reflect.Float64:
-	case reflect.String:
-	default:
+	vkt := t.Key()
+	if vkt.Kind() == reflect.Interface {
 		return unsupportedTypeEncoder
 	}
-	me := &mapEncoder{typeEncoder(t.Elem())}
+	var keytextEnc encoderFunc
+	if vkt.Implements(textMarshalerType) && vkt.Implements(textUnmarshalerType) {
+		keytextEnc = textMapKeyMarshalerEncoder
+	} else {
+		switch vkt.Kind() {
+		case reflect.Bool:
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		case reflect.Float32:
+		case reflect.Float64:
+		case reflect.String:
+		default:
+			return unsupportedTypeEncoder
+		}
+	}
+	me := &mapEncoder{elemEnc: typeEncoder(t.Elem()), keytextEnc: keytextEnc}
 	return me.encode
 }
 
