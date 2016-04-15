@@ -8,7 +8,7 @@ and implement `encoding.TextMarshaler`'s method MarshalText() (text []byte, err 
     import (
     	"fmt"
     
-    	"github.com/zxfonline/json"
+     	"github.com/zxfonline/json"
     )
     
     type Person struct {
@@ -23,8 +23,8 @@ and implement `encoding.TextMarshaler`'s method MarshalText() (text []byte, err 
     		FirstName: "FirstName",
     		LastName:  "LastName",
     	}
-    	jsun.UnderScoreStyle()
-    	b, _ := jsun.Marshal(&p)
+    	json.UnderScoreStyle()
+    	b, _ := json.Marshal(&p)
     	fmt.Println(string(b))
     }
 
@@ -38,7 +38,7 @@ output
      import (
      	"fmt"
     
-     	"github.com/JessonChan/jsun"
+     	"github.com/zxfonline/json"
      )
     
      type Person struct {
@@ -53,7 +53,7 @@ output
      		FirstName: "FirstName",
      		LastName:  "LastName",
      	}
-     	b, _ := jsun.Marshal(&p)
+     	b, _ := json.Marshal(&p)
      	fmt.Println(string(b))
      }
 
@@ -61,13 +61,15 @@ output
 
 > {"id":1,"firstName":"FirstName","name":"LastName"}
 
-    package main
 
-import (
+    package main
+    
+     import (
      	"fmt"
-	
+    
      	"github.com/zxfonline/json"
-)
+     )
+    
 	
      	func main() {
      	     	m := make(map[*EE]bool)
