@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -716,19 +717,43 @@ func (d *decodeState) object(v reflect.Value) {
 					kv.SetBool(n)
 					v.SetMapIndex(kv, subv)
 				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-					n, err := strconv.ParseInt(s, 10, 64)
-					if err != nil {
-						d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
-						break
+					var n int64
+					var err error
+					if strings.LastIndex(s, "e+") == -1 {
+						n, err = strconv.ParseInt(s, 10, 64)
+						if err != nil {
+							d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
+							break
+						}
+					} else {
+						var dn float64
+						dn, err = strconv.ParseFloat(s, 64)
+						if err != nil {
+							d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
+							break
+						}
+						n = int64(dn)
 					}
 					kv := reflect.New(vkt).Elem()
 					kv.SetInt(n)
 					v.SetMapIndex(kv, subv)
 				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-					n, err := strconv.ParseUint(s, 10, 64)
-					if err != nil {
-						d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
-						break
+					var n uint64
+					var err error
+					if strings.LastIndex(s, "e+") == -1 {
+						n, err = strconv.ParseUint(s, 10, 64)
+						if err != nil {
+							d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
+							break
+						}
+					} else {
+						var dn float64
+						dn, err = strconv.ParseFloat(s, 64)
+						if err != nil {
+							d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
+							break
+						}
+						n = uint64(dn)
 					}
 					kv := reflect.New(vkt).Elem()
 					kv.SetUint(n)
