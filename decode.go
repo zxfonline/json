@@ -719,7 +719,7 @@ func (d *decodeState) object(v reflect.Value) {
 				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 					var n int64
 					var err error
-					if strings.LastIndex(s, "e+") == -1 {
+					if strings.LastIndex(strings.ToLower(s), "e+") == -1 {
 						n, err = strconv.ParseInt(s, 10, 64)
 						if err != nil {
 							d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
@@ -740,7 +740,7 @@ func (d *decodeState) object(v reflect.Value) {
 				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 					var n uint64
 					var err error
-					if strings.LastIndex(s, "e+") == -1 {
+					if strings.LastIndex(strings.ToLower(s), "e+") == -1 {
 						n, err = strconv.ParseUint(s, 10, 64)
 						if err != nil {
 							d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
@@ -969,7 +969,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			var n int64
 			var err error
-			if strings.LastIndex(s, "e+") == -1 {
+			if strings.LastIndex(strings.ToLower(s), "e+") == -1 {
 				n, err = strconv.ParseInt(s, 10, 64)
 				if err != nil || v.OverflowInt(n) {
 					d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
@@ -992,7 +992,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 			var n uint64
 			var err error
-			if strings.LastIndex(s, "e+") == -1 {
+			if strings.LastIndex(strings.ToLower(s), "e+") == -1 {
 				n, err = strconv.ParseUint(s, 10, 64)
 				if err != nil || v.OverflowUint(n) {
 					d.saveError(&UnmarshalTypeError{"number " + s, v.Type(), int64(d.off)})
