@@ -647,7 +647,7 @@ func (me *mapEncoder) encode(e *encodeState, v reflect.Value, _ bool) {
 		return
 	}
 	e.WriteByte('{')
-	var sv stringValues = v.MapKeys()
+	sv := keyList(v.MapKeys())
 	sort.Sort(sv)
 	for i, k := range sv {
 		if i > 0 {
