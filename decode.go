@@ -909,6 +909,62 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		switch v.Kind() {
 		default:
 			d.saveError(&UnmarshalTypeError{"string", v.Type(), int64(d.off)})
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			ss := string(s)
+			var n int64
+			var err error
+			if strings.LastIndex(strings.ToLower(ss), "e+") == -1 {
+				n, err = strconv.ParseInt(ss, 10, 64)
+				if err != nil || v.OverflowInt(n) {
+					d.saveError(&UnmarshalTypeError{"string " + ss, v.Type(), int64(d.off)})
+					break
+				}
+			} else {
+				var dn float64
+				dn, err = strconv.ParseFloat(ss, 64)
+				if err != nil {
+					d.saveError(&UnmarshalTypeError{"string " + ss, v.Type(), int64(d.off)})
+					break
+				}
+				n = int64(dn)
+				if v.OverflowInt(n) {
+					d.saveError(&UnmarshalTypeError{"string " + ss, v.Type(), int64(d.off)})
+					break
+				}
+			}
+			v.SetInt(n)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+			ss := string(s)
+			var n uint64
+			var err error
+			if strings.LastIndex(strings.ToLower(ss), "e+") == -1 {
+				n, err = strconv.ParseUint(ss, 10, 64)
+				if err != nil || v.OverflowUint(n) {
+					d.saveError(&UnmarshalTypeError{"string " + ss, v.Type(), int64(d.off)})
+					break
+				}
+			} else {
+				var dn float64
+				dn, err = strconv.ParseFloat(ss, 64)
+				if err != nil {
+					d.saveError(&UnmarshalTypeError{"string " + ss, v.Type(), int64(d.off)})
+					break
+				}
+				n = uint64(dn)
+				if v.OverflowUint(n) {
+					d.saveError(&UnmarshalTypeError{"string " + ss, v.Type(), int64(d.off)})
+					break
+				}
+			}
+			v.SetUint(n)
+		case reflect.Float32, reflect.Float64:
+			ss := string(s)
+			n, err := strconv.ParseFloat(ss, v.Type().Bits())
+			if err != nil || v.OverflowFloat(n) {
+				d.saveError(&UnmarshalTypeError{"string " + ss, v.Type(), int64(d.off)})
+				break
+			}
+			v.SetFloat(n)
 		case reflect.Slice:
 			if v.Type().Elem().Kind() != reflect.Uint8 {
 				d.saveError(&UnmarshalTypeError{"string", v.Type(), int64(d.off)})
@@ -942,7 +998,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		s := string(item)
 		switch v.Kind() {
 		default:
-			if v.Kind() == reflect.String && v.Type() == numberType {
+			if v.Kind() == reflect.String /* && v.Type() == numberType*/ {
 				v.SetString(s)
 				if !isValidNumber(s) {
 					d.error(fmt.Errorf("json: invalid number literal, trying to unmarshal %q into Number", item))
